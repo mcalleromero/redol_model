@@ -1,11 +1,4 @@
-DATASET_DIRECTORY = "../../datasets/"
-PLOTS = "../../plots/"
-DATA = "../../data/"
-
-SYNTHETIC = "synthetic/"
-DATASETS = "datasets/"
-SCORES = "scores/"
-STRATIFIED = "stratified/"
+DATASET_DIRECTORY = "../data/"
 
 COLOR_BLUE = "\033[94m"
 END_C = "\033[0m"
