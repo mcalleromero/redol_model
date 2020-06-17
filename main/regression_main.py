@@ -82,7 +82,7 @@ def main():
     baggingclf.predict(X_test)
 
     print("----------------------------------------------")
-    print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
+    print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, reg_redol_clf.score(X_test, y_test)))
     print("{} Alfredo:{} {}".format(properties.COLOR_BLUE, properties.END_C, clf.score(X_test, y_test)))
     print("{} Random forest score:{} {}".format(properties.COLOR_BLUE, properties.END_C, rfclf.score(X_test, y_test)))
     print("{} Boosting score:{} {}".format(properties.COLOR_BLUE, properties.END_C, boostingclf.score(X_test, y_test)))

@@ -79,56 +79,6 @@ class RegressionRedol:
 
         return np.array(predictions).transpose()
 
-    def predict_proba_error(self, x):
-        """
-        This method calculates a matrix which contains the probabilities of each example cumulatively.
-
-        :param x: the original features from the dataset
-        :param suggested_class: the class the classifier uses as new feature
-        :return: the final probabilities matrix
-        """
-        self.predictions = []
-
-        for cl in self.classes:
-            preds = []
-
-            _x = x.copy()
-            if len(self.classes) > 2:
-                _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
-            else:
-                _x = np.c_[_x, np.repeat(cl, x.shape[0])]
-
-            [preds.append(clf.predict_proba(_x)) for clf in self.classifiers]
-            preds = np.array(preds)
-
-            for i in range(len(self.classifiers)-1, -1, -1):
-                preds[i, :, :] = preds[:i+1, :, :].sum(axis=0)
-                preds[i, :, :] /= i+1
-
-            self.predictions.append(preds[:, :, 1].transpose())
-
-        self.predictions = np.array(self.predictions).transpose()
-
-        return self.predictions
-
-    def score_error(self, x, y, n_classifiers=100):
-        """
-        With this method we are able to see what is going on with the classification of the examples for each classifier.
-        This method allows us to calculate the score obtained using the amount of classifiers we want up to the maximum
-        of classifiers with which it was declared.
-
-        :param x: original features dataset
-        :param y: original classes from the dataset
-        :param n_classifiers: number of classifiers used to calculate the score
-        :return: score obtained
-        """
-        if n_classifiers is None:
-            n_classifiers = len(self.classifiers)
-
-        n_classifiers -= 1
-
-        return sum([1 for i, pred in enumerate(self.predictions[n_classifiers, :, :]) if float(np.where(pred == np.amax(pred))[0][0] == y[i])]) / x.shape[0]
-
     def _change_class(self, x, y):
         """
         Given a data set split in features and classes this method transforms this set into another set.
