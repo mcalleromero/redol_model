@@ -13,6 +13,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import RandomForestClassifier
 
+from src.redol_regression import *
 from src.redol import *
 from src.Alfredo import *
 
@@ -49,11 +50,16 @@ def main():
 
     n_trees = 100
 
+    reg_redol_clf = RegressionRedol(n_estimators=n_trees, perc=0.75)
     redolclf = Redol(n_estimators=n_trees, perc=0.75)
     clf = Alfredo(n_trees=n_trees, perc=0.75)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
     boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
     baggingclf = BaggingClassifier(n_estimators=n_trees)
+
+    print("Entrenamiento regresión Redol\n")
+    reg_redol_clf.fit(X_train, y_train)
+    reg_redol_clf.predict(X_test)
 
     print("Entrenamiento Redol\n")
     redolclf.fit(X_train, y_train)

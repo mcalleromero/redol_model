@@ -5,10 +5,11 @@ from __future__ import division
 import numpy as np
 from random import *
 from sklearn import tree
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
 
 
-class Redol:
+class RegressionRedol:
 
     def __init__(self, n_estimators=100, perc=0.75, bagg=True):
         self.n_estimators = n_estimators
@@ -28,24 +29,10 @@ class Redol:
         self.enc = OneHotEncoder(handle_unknown='ignore')
         self.enc.fit(y.reshape(-1, 1))
 
-        self.classifiers = []
+        modified_x, modified_y = self._change_class(x, y)
 
-        for classifier in range(self.n_estimators):
-            tree_clf = tree.DecisionTreeClassifier()
-
-            _x = x
-            _y = y
-
-            if self.bagg:
-                ind = np.random.randint(0, x.shape[0], x.shape[0])
-
-                _x = x[ind, :]
-                _y = y[ind]
-
-            modified_x, modified_y = self._change_class(_x, _y)
-
-            tree_clf.fit(modified_x, modified_y)
-            self.classifiers.append(tree_clf)
+        self.clf = LogisticRegression()
+        self.clf.fit(modified_x, modified_y)
 
     def score(self, x, y):
         """
@@ -85,13 +72,9 @@ class Redol:
             preds = []
 
             _x = x.copy()
-            if len(self.classes) > 2:
-                _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
-            else:
-                _x = np.c_[_x, np.repeat(cl, x.shape[0])]
+            _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
 
-            [preds.append(clf.predict_proba(_x)) for clf in self.classifiers]
-            preds = np.array(preds).mean(axis=0)
+            preds = self.clf.predict_proba(_x)
             predictions.append(preds[:, 1])
 
         return np.array(predictions).transpose()
@@ -164,39 +147,16 @@ class Redol:
 
         num_data = data.shape[0]
 
-        percentage = int(num_data * self.perc)
+        updated_data = []
 
-        updated_data = data.copy()
+        for _instance in data:
+            for _cl in self.classes:
+                _new_class = 1. if _instance[-1] == _cl else 0.
+                _new_instance = np.concatenate([_instance[:-1], self.enc.transform([[_cl]]).toarray()[0]])
+                _new_instance = np.append(_new_instance, _new_class)
 
-        random_data = list(range(0, num_data))
-        shuffle(random_data)
+                updated_data.append(_new_instance)
 
-        if len(self.classes) <= 2:
-            updated_data = self._binary(percentage, random_data, updated_data)
-        else:
-            updated_data = self._multiclass(percentage, random_data, updated_data, y)
+        updated_data = np.array(updated_data)
 
-        updated_class = [(updated_data[i, -1] == data[i, -1]) for i in range(0, num_data)]
-
-        # Changes the old class from the data features to the one hot encoder ones
-        if len(self.classes) > 2:
-            updated_data = np.c_[updated_data[:,:-1], self.enc.transform(updated_data[:, -1].reshape(-1, 1)).toarray()]
-
-        return updated_data, np.array(updated_class)
-
-    def _binary(self, percentage, random_data, updated_data):
-        for num in random_data[:percentage]:
-            updated_data[num, -1] = 1 - updated_data[num, -1]
-
-        return updated_data
-
-    def _multiclass(self, percentage, random_data, updated_data, y):
-        classes = list(set(y))
-
-        for num in random_data[:percentage]:
-            prev_class = updated_data[num, -1]
-            classes_without_prev_class = classes.copy()  # copy classes list
-            classes_without_prev_class.remove(prev_class)
-            updated_data[num, -1] = choice(classes_without_prev_class)
-
-        return updated_data
+        return updated_data[:,:-1], updated_data[:,-1]
