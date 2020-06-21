@@ -44,6 +44,7 @@ class RegressionRedol:
         :param suggested_class: a new feature added to classify the examples
         :return: classifier accuracy
         """
+        print(y)
         return sum([1 for i, prediction in enumerate(self.predict(x)) if prediction == y[i]])/x.shape[0]
 
     def predict(self, x):
@@ -75,6 +76,7 @@ class RegressionRedol:
             _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
 
             preds = self.clf.predict_proba(_x)
+            print(preds[0])
             predictions.append(preds[:, 1])
 
         return np.array(predictions).transpose()
