@@ -5,6 +5,8 @@ sys.path.append('/home/cromero/redol_model/')
 import util.properties as properties
 
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
 from sklearn.datasets import make_moons
 
 import pandas as pd
@@ -48,9 +50,14 @@ def main():
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
+    # STANDARD SCALER
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
     n_trees = 100
 
-    reg_redol_clf = RegressionRedol(n_estimators=n_trees, perc=0.75)
+    reg_redol_clf = RegressionRedol()
     redolclf = Redol(n_estimators=n_trees, perc=0.75)
     clf = Alfredo(n_trees=n_trees, perc=0.75)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
@@ -82,11 +89,17 @@ def main():
     baggingclf.predict(X_test)
 
     print("----------------------------------------------")
-    print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, reg_redol_clf.score(X_test, y_test)))
+    print("{} Regression Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, reg_redol_clf.score(X_test, y_test)))
+    print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
     print("{} Alfredo:{} {}".format(properties.COLOR_BLUE, properties.END_C, clf.score(X_test, y_test)))
     print("{} Random forest score:{} {}".format(properties.COLOR_BLUE, properties.END_C, rfclf.score(X_test, y_test)))
     print("{} Boosting score:{} {}".format(properties.COLOR_BLUE, properties.END_C, boostingclf.score(X_test, y_test)))
     print("{} Bagging score:{} {}".format(properties.COLOR_BLUE, properties.END_C, baggingclf.score(X_test, y_test)))
+    print("----------------------------------------------")
+
+    for clfi in [reg_redol_clf,redolclf,clf,rfclf,boostingclf,baggingclf]:
+        print(clfi)
+        print(confusion_matrix(y_test, clfi.predict(X_test)))
 
 
 if __name__ == "__main__":

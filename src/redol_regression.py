@@ -4,6 +4,7 @@ from __future__ import division
 
 import numpy as np
 from random import *
+
 from sklearn import tree
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
@@ -11,10 +12,6 @@ from sklearn.preprocessing import OneHotEncoder
 
 class RegressionRedol:
 
-    def __init__(self, n_estimators=100, perc=0.75, bagg=True):
-        self.n_estimators = n_estimators
-        self.perc = perc
-        self.bagg = bagg
 
     def fit(self, x, y):
         """
@@ -44,7 +41,6 @@ class RegressionRedol:
         :param suggested_class: a new feature added to classify the examples
         :return: classifier accuracy
         """
-        print(y)
         return sum([1 for i, prediction in enumerate(self.predict(x)) if prediction == y[i]])/x.shape[0]
 
     def predict(self, x):
@@ -76,7 +72,6 @@ class RegressionRedol:
             _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
 
             preds = self.clf.predict_proba(_x)
-            print(preds[0])
             predictions.append(preds[:, 1])
 
         return np.array(predictions).transpose()

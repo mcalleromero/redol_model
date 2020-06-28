@@ -6,14 +6,16 @@ import numpy as np
 from random import *
 from sklearn import tree
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.linear_model import LogisticRegression
 
 
 class Redol:
 
-    def __init__(self, n_estimators=100, perc=0.75, bagg=True):
+    def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree'):
         self.n_estimators = n_estimators
         self.perc = perc
         self.bagg = bagg
+        self.classifier = classifier
 
     def fit(self, x, y):
         """
@@ -31,7 +33,10 @@ class Redol:
         self.classifiers = []
 
         for classifier in range(self.n_estimators):
-            tree_clf = tree.DecisionTreeClassifier()
+            if self.classifier == 'tree':
+                clf = tree.DecisionTreeClassifier()
+            elif self.classifier == 'regression':
+                clf = LogisticRegression()
 
             _x = x
             _y = y
@@ -44,8 +49,8 @@ class Redol:
 
             modified_x, modified_y = self._change_class(_x, _y)
 
-            tree_clf.fit(modified_x, modified_y)
-            self.classifiers.append(tree_clf)
+            clf.fit(modified_x, modified_y)
+            self.classifiers.append(clf)
 
     def score(self, x, y):
         """
