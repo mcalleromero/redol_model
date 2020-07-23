@@ -1,6 +1,5 @@
 import sys
-
-sys.path.append('/home/cromero/redol_model/')
+sys.path.append('/opt/')
 
 import util.properties as properties
 
@@ -13,8 +12,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-from src.redol import *
-from src.Alfredo import *
+from redol.redol import *
 
 
 def get_data():
@@ -50,7 +48,6 @@ def main():
     n_trees = 100
 
     redolclf = Redol(n_estimators=n_trees, perc=0.75)
-    clf = Alfredo(n_trees=n_trees, perc=0.75)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
     boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
     baggingclf = BaggingClassifier(n_estimators=n_trees)
@@ -58,10 +55,6 @@ def main():
     print("Entrenamiento Redol\n")
     redolclf.fit(X_train, y_train)
     redolclf.predict(X_test)
-
-    print("Entrenamiento Alfredo\n")
-    clf.fit(X_train, y_train)
-    clf.predict(X_test)
 
     print("Entrenamiento RF\n")
     rfclf.fit(X_train, y_train)
@@ -77,7 +70,6 @@ def main():
 
     print("----------------------------------------------")
     print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
-    print("{} Alfredo:{} {}".format(properties.COLOR_BLUE, properties.END_C, clf.score(X_test, y_test)))
     print("{} Random forest score:{} {}".format(properties.COLOR_BLUE, properties.END_C, rfclf.score(X_test, y_test)))
     print("{} Boosting score:{} {}".format(properties.COLOR_BLUE, properties.END_C, boostingclf.score(X_test, y_test)))
     print("{} Bagging score:{} {}".format(properties.COLOR_BLUE, properties.END_C, baggingclf.score(X_test, y_test)))
