@@ -8,14 +8,17 @@ from sklearn import tree
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 
+import pymp
+
 
 class Redol:
 
-    def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree'):
+    def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree', n_jobs=1):
         self.n_estimators = n_estimators
         self.perc = perc
         self.bagg = bagg
         self.classifier = classifier
+        self.n_jobs = n_jobs
 
     def fit(self, x, y):
         """
@@ -30,27 +33,32 @@ class Redol:
         self.enc = OneHotEncoder(handle_unknown='ignore')
         self.enc.fit(y.reshape(-1, 1))
 
-        self.classifiers = []
+        # self.classifiers = []
+        self.classifiers = pymp.shared.list()
 
-        for classifier in range(self.n_estimators):
-            if self.classifier == 'tree':
-                clf = tree.DecisionTreeClassifier()
-            elif self.classifier == 'regression':
-                clf = LogisticRegression()
+        with pymp.Parallel(self.n_jobs) as p:
+            for n_classifier in p.range(0, self.n_estimators):
+                if self.classifier == 'tree':
+                    clf = tree.DecisionTreeClassifier()
+                elif self.classifier == 'regression':
+                    clf = LogisticRegression()
 
-            _x = x
-            _y = y
+                _x = x
+                _y = y
 
-            if self.bagg:
-                ind = np.random.randint(0, x.shape[0], x.shape[0])
+                if self.bagg:
+                    ind = np.random.randint(0, x.shape[0], x.shape[0])
 
-                _x = x[ind, :]
-                _y = y[ind]
+                    _x = x[ind, :]
+                    _y = y[ind]
 
-            modified_x, modified_y = self._change_class(_x, _y)
+                modified_x, modified_y = self._change_class(_x, _y)
 
-            clf.fit(modified_x, modified_y)
-            self.classifiers.append(clf)
+                clf.fit(modified_x, modified_y)
+
+                # self.classifiers[n_classifier] = clf
+                with p.lock:
+                    self.classifiers.append(clf)
 
     def score(self, x, y):
         """

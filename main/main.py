@@ -1,5 +1,7 @@
 import sys
-sys.path.append('/opt/')
+sys.path.append('/home/mario.calle/master/redol_model/')
+
+import time
 
 import util.properties as properties
 
@@ -41,32 +43,49 @@ def get_data():
         raise ValueError("File not found")
 
 def main():
+
     X, y = get_data()
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
     n_trees = 100
 
-    redolclf = Redol(n_estimators=n_trees, perc=0.75)
+    redolclf = Redol(n_estimators=n_trees, perc=0.75, n_jobs=8)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
     boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
     baggingclf = BaggingClassifier(n_estimators=n_trees)
+
+    starttime = time.time()
 
     print("Entrenamiento Redol\n")
     redolclf.fit(X_train, y_train)
     redolclf.predict(X_test)
 
+    print('That took {} seconds'.format(time.time() - starttime))
+
+    starttime = time.time()
+
     print("Entrenamiento RF\n")
     rfclf.fit(X_train, y_train)
     rfclf.predict(X_test)
+
+    print('That took {} seconds'.format(time.time() - starttime))
+
+    starttime = time.time()
 
     print("Entrenamiento Boosting\n")
     boostingclf.fit(X_train, y_train)
     boostingclf.predict(X_test)
 
+    print('That took {} seconds'.format(time.time() - starttime))
+
+    starttime = time.time()
+
     print("Entrenamiento Bagging\n")
     baggingclf.fit(X_train, y_train)
     baggingclf.predict(X_test)
+
+    print('That took {} seconds'.format(time.time() - starttime))
 
     print("----------------------------------------------")
     print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))

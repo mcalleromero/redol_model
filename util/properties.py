@@ -1,4 +1,4 @@
-DATASET_DIRECTORY = "data/"
+DATASET_DIRECTORY = "../data/"
 
 COLOR_BLUE = "\033[94m"
 END_C = "\033[0m"
