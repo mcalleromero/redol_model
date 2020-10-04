@@ -1,3 +1,3 @@
 # Profiler
-xterm &
-mpstat –P ALL 1
+- xterm &
+- mpstat –P ALL 1

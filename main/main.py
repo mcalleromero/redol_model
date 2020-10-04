@@ -50,7 +50,7 @@ def main():
 
     n_trees = 100
 
-    redolclf = Redol(n_estimators=n_trees, perc=0.75, n_jobs=8)
+    redolclf = RedolClassifier(n_estimators=n_trees, perc=0.75, n_jobs=8)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
     boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
     baggingclf = BaggingClassifier(n_estimators=n_trees)

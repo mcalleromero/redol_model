@@ -11,7 +11,7 @@ from sklearn.linear_model import LogisticRegression
 import pymp
 
 
-class Redol:
+class RedolClassifier:
 
     def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree', n_jobs=1):
         self.n_estimators = n_estimators
