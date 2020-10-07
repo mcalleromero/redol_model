@@ -13,7 +13,7 @@ import pymp
 
 class RedolClassifier:
 
-    def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree', n_jobs=1):
+    def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree', n_jobs=8):
         self.n_estimators = n_estimators
         self.perc = perc
         self.bagg = bagg

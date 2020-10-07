@@ -1,12 +1,11 @@
-import sys
-sys.path.append('/home/mario.calle/master/redol_model/')
+import os
+import logging
 
 import time
 
-import util.properties as properties
+import properties as properties
 
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import make_moons
 
 import pandas as pd
 
@@ -14,84 +13,72 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-from redol.redol import *
+from redol.redol import RedolClassifier
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
-def get_data():
-    if len(sys.argv) > 1:
-        try:
-            dataset = pd.read_csv(properties.DATASET_DIRECTORY + sys.argv[1])
+def get_data(file):
+    try:
+        dataset = pd.read_csv(file)
 
-            cat_columns = ['class']
+        cat_columns = ['class']
 
-            if sys.argv[1] == "tic-tac-toe":
-                cat_columns = dataset.select_dtypes(['object']).columns
+        # if file == "tic-tac-toe":
+        #     cat_columns = dataset.select_dtypes(['object']).columns
 
-            dataset[cat_columns] = dataset[cat_columns].astype('category')
-            dataset[cat_columns] = dataset[cat_columns].apply(lambda x: x.cat.codes)
-            # xdataset = pd.get_dummies(dataset, columns=cat_columns)
-            dataset = dataset.values
+        dataset[cat_columns] = dataset[cat_columns].astype('category')
+        dataset[cat_columns] = dataset[cat_columns].apply(lambda x: x.cat.codes)
+        # xdataset = pd.get_dummies(dataset, columns=cat_columns)
+        dataset = dataset.values
 
-            X, y = dataset[:,:-1], dataset[:,-1]
+        X, y = dataset[:,:-1], dataset[:,-1]
 
-            return X, y
-        except IOError:
-            print("File \"{}\" does not exist.".format(sys.argv[1]))
-            return
-
-    else:
-        raise ValueError("File not found")
+        return X, y
+    except IOError:
+        log.info("File \"{}\" does not exist.".format(file))
+        return
 
 def main():
 
-    X, y = get_data()
+    base_path = os.getenv('INPUT_DATA')
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    if not os.path.exists(base_path):
+        try:
+            os.mkdir(base_path)
+        except OSError:
+            log.info("Creation of the directory %s failed" % path)
+        else:
+            log.info("Successfully created the directory %s " % path)
 
-    n_trees = 100
+    while True:
+        if not os.listdir(base_path):
+            log.info('There are no files to read. Sleep 5 seconds.')
+            time.sleep(5)
+            continue
+        else:
+            # Getting first file from the input_data folder
+            f = f'{base_path}/{os.listdir(base_path)[0]}'
 
-    redolclf = RedolClassifier(n_estimators=n_trees, perc=0.75, n_jobs=8)
-    rfclf = RandomForestClassifier(n_estimators=n_trees)
-    boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
-    baggingclf = BaggingClassifier(n_estimators=n_trees)
+            X, y = get_data(f)
 
-    starttime = time.time()
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-    print("Entrenamiento Redol\n")
-    redolclf.fit(X_train, y_train)
-    redolclf.predict(X_test)
+            n_trees = 100
 
-    print('That took {} seconds'.format(time.time() - starttime))
+            redolclf = RedolClassifier(n_estimators=n_trees, perc=0.75, n_jobs=8)
 
-    starttime = time.time()
+            starttime = time.time()
 
-    print("Entrenamiento RF\n")
-    rfclf.fit(X_train, y_train)
-    rfclf.predict(X_test)
+            log.info("Fitting Redol\n")
+            redolclf.fit(X_train, y_train)
+            redolclf.predict(X_test)
 
-    print('That took {} seconds'.format(time.time() - starttime))
+            log.info('That took {} seconds'.format(time.time() - starttime))
 
-    starttime = time.time()
-
-    print("Entrenamiento Boosting\n")
-    boostingclf.fit(X_train, y_train)
-    boostingclf.predict(X_test)
-
-    print('That took {} seconds'.format(time.time() - starttime))
-
-    starttime = time.time()
-
-    print("Entrenamiento Bagging\n")
-    baggingclf.fit(X_train, y_train)
-    baggingclf.predict(X_test)
-
-    print('That took {} seconds'.format(time.time() - starttime))
-
-    print("----------------------------------------------")
-    print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
-    print("{} Random forest score:{} {}".format(properties.COLOR_BLUE, properties.END_C, rfclf.score(X_test, y_test)))
-    print("{} Boosting score:{} {}".format(properties.COLOR_BLUE, properties.END_C, boostingclf.score(X_test, y_test)))
-    print("{} Bagging score:{} {}".format(properties.COLOR_BLUE, properties.END_C, baggingclf.score(X_test, y_test)))
+            log.info("----------------------------------------------")
+            log.info("{} Redol accuracy:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
 
 
 if __name__ == "__main__":
