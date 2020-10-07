@@ -1,5 +1,5 @@
 import os
-import logging
+import shutil
 
 import time
 
@@ -15,9 +15,6 @@ from sklearn.ensemble import RandomForestClassifier
 
 from redol.redol import RedolClassifier
 
-log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
-
 
 def get_data(file):
     try:
@@ -30,14 +27,13 @@ def get_data(file):
 
         dataset[cat_columns] = dataset[cat_columns].astype('category')
         dataset[cat_columns] = dataset[cat_columns].apply(lambda x: x.cat.codes)
-        # xdataset = pd.get_dummies(dataset, columns=cat_columns)
         dataset = dataset.values
 
         X, y = dataset[:,:-1], dataset[:,-1]
 
         return X, y
     except IOError:
-        log.info("File \"{}\" does not exist.".format(file))
+        print("File \"{}\" does not exist.".format(file))
         return
 
 def main():
@@ -48,18 +44,27 @@ def main():
         try:
             os.mkdir(base_path)
         except OSError:
-            log.info("Creation of the directory %s failed" % path)
+            print("Creation of the directory %s failed" % path)
         else:
-            log.info("Successfully created the directory %s " % path)
+            print("Successfully created the directory %s " % path)
+
+    if not os.path.exists(f'processed_data'):
+        try:
+            os.mkdir(f'processed_data')
+        except OSError:
+            print("Creation of the directory processed_data failed")
+        else:
+            print("Successfully created the directory processed_data")
 
     while True:
         if not os.listdir(base_path):
-            log.info('There are no files to read. Sleep 5 seconds.')
+            print('There are no files to read. Sleep 5 seconds.')
             time.sleep(5)
             continue
         else:
             # Getting first file from the input_data folder
-            f = f'{base_path}/{os.listdir(base_path)[0]}'
+            filename = os.listdir(base_path)[0]
+            f = f'{base_path}/{filename}'
 
             X, y = get_data(f)
 
@@ -71,14 +76,16 @@ def main():
 
             starttime = time.time()
 
-            log.info("Fitting Redol\n")
+            print("Fitting Redol\n")
             redolclf.fit(X_train, y_train)
             redolclf.predict(X_test)
 
-            log.info('That took {} seconds'.format(time.time() - starttime))
+            print('That took {} seconds'.format(time.time() - starttime))
 
-            log.info("----------------------------------------------")
-            log.info("{} Redol accuracy:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
+            print("----------------------------------------------")
+            print("{} Redol accuracy:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
+
+            shutil.move(f, f'processed_data/{filename}')
 
 
 if __name__ == "__main__":

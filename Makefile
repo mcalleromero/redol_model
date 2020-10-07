@@ -10,7 +10,7 @@ all: make_dirs
 	docker image build -t redol_model_reader:$(VERSION) .
 
 	docker run -e INPUT_DATA=$(INPUT_DATA) \
-			   -v $(PWD)/$(INPUT_DATA):/opt/$(INPUT_DATA) \
+			   -v $(shell pwd)/$(INPUT_DATA):/opt/$(INPUT_DATA) \
 			   --name redol_model_reader \
 			   -d redol_model_reader:$(VERSION);
 
