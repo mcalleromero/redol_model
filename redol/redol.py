@@ -7,6 +7,7 @@ from random import *
 from sklearn import tree
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import scale
 
 import pymp
 
@@ -60,6 +61,8 @@ class RedolClassifier:
                 with p.lock:
                     self.classifiers.append(clf)
 
+        return self
+
     def score(self, x, y):
         """
         This method is used to calculate the classifier accuracy comparing the obtained classes with the original
@@ -107,7 +110,42 @@ class RedolClassifier:
             preds = np.array(preds).mean(axis=0)
             predictions.append(preds[:, 1])
 
-        return np.array(predictions).transpose()
+        # Normalization of %
+        # predictions = predictions / np.sum(predictions, axis=1)[:,None]
+
+        # Not normalized
+        predictions = np.array(predictions).transpose()
+
+        return predictions
+
+    def predict_by_clf(self, x, prev_preds):
+        """
+        This method is used to get the predictions of each classifier from the ensemble.
+        If X shape is (N, D) and the number of classifiers is M, the function will return
+        a list of shape (M, N) with the results of labelling each instance by each classifier. 
+
+        :param x: original features from the dataset
+        :return: an array with the predicted class for each example from the dataset by each classifier
+        """
+        predictions = []
+
+        # for cl in self.classes:
+        #     preds = []
+
+        #     _x = x.copy()
+        #     if len(self.classes) > 2:
+        #         _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
+        #     else:
+        #         _x = np.c_[_x, np.repeat(cl, x.shape[0])]
+
+        _x = x.copy()
+        _x = np.c_[_x, prev_preds]
+
+        for clf in self.classifiers:
+            predictions.append([prev_preds[i] if (pred == 1) else (1 - prev_preds[i]) for i,pred in enumerate(clf.predict(_x))])
+
+        # Sólo estoy cogiendo los 100 primeros clasificadores, que se corresponde con la primera de las clases...
+        return np.array(predictions)
 
     def predict_proba_error(self, x):
         """
@@ -213,3 +251,26 @@ class RedolClassifier:
             updated_data[num, -1] = choice(classes_without_prev_class)
 
         return updated_data
+
+    def get_margins(self, X_test, y_test):
+        """This function gets the margins for each instance
+
+        Args:
+            X_test : Test features
+            y_test : Test labels
+
+        Returns:
+            margins : margins for each instance of the test dataset
+            X_predictions : predictions made by the margins
+        """
+        if len(np.unique(y_test)) > 2:
+            raise ValueError('Classification problem must be binary.')
+
+        margins = np.zeros_like(y_test)
+
+        probs = self.predict_proba(X_test)
+        margins[y_test == 0] = probs[y_test == 0, 0] - probs[y_test == 0, 1]
+        margins[y_test == 1] = probs[y_test == 1, 1] - probs[y_test == 1, 0]
+        margins /= np.sum(probs, axis=1)
+
+        return margins, np.where(margins > 0, y_test, 1 - y_test)

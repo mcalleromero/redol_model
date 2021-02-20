@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/cromero/redol_model/')
+sys.path.append('/home/mario.calle/master/redol_model/')
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -39,11 +39,11 @@ def main():
     X, y = get_data(model)
 
     n_trees = 100
-    k_folds = 100
+    k_folds = 50
 
     print(f'Stratifying {model}')
 
-    skf = StratifiedShuffleSplit(n_splits=k_folds, test_size=0.66)
+    skf = StratifiedShuffleSplit(n_splits=k_folds, test_size=0.8)
 
     train = []
     test = []

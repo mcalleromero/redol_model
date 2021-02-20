@@ -51,7 +51,7 @@ def main():
     X, y = get_data(model)
 
     n_trees = 100
-    k_folds = 100
+    k_folds = 50
     
     train = np.load(f'../data/stratified_index/{model}_train.npy')
     test = np.load(f'../data/stratified_index/{model}_test.npy')

@@ -1,0 +1,10 @@
+El modelo de ringnorm generado con generator.py me da un 4-5% de error, comparado con el 1,3%
+que daba con el modelo generado mediante el AWK.
+
+Como se plotea la distribucion de los margenes?
+
+Los margenes de REDOL no coinciden con la clasificacion, al contrario que random forest
+
+He normalizado el predict proba, pero lo he quitado para las pruebas porque daba algun error con wdbc?
+
+En general REDOL aumenta el bias
