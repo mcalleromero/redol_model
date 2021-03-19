@@ -7,18 +7,58 @@ from random import *
 from sklearn import tree
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
+from collections import defaultdict
 
 import pymp
+
+def RedolClassifierException(Exception):
+    pass
 
 
 class RedolClassifier:
 
-    def __init__(self, n_estimators=100, perc=0.75, bagg=True, classifier='tree', n_jobs=1):
+    def __init__(self, n_estimators=100, method="regular", perc=0.75, bootstrap=1.0, classifier='tree', n_jobs=8, max_depth=None):
         self.n_estimators = n_estimators
+        self.method = method
         self.perc = perc
-        self.bagg = bagg
+        self.bootstrap = bootstrap
         self.classifier = classifier
         self.n_jobs = n_jobs
+        self.max_depth = max_depth
+
+    def get_params(self, deep=True):
+        # TODO: With deep true it should return base learners params too
+        return {
+            'n_estimators': self.n_estimators,
+            'perc': self.perc,
+            'bootstrap': self.bootstrap,
+            'classifier': self.classifier,
+            'n_jobs': self.n_jobs,
+            'max_depth': self.max_depth,
+            'method': self.method,
+        }
+
+    def set_params(self, **params):
+        valid_params = self.get_params(deep=True)
+        nested_params = defaultdict(dict)  # grouped by prefix
+        for key, value in params.items():
+            key, delim, sub_key = key.partition('__')
+            if key not in valid_params:
+                raise ValueError('Invalid parameter %s for estimator %s. '
+                                 'Check the list of available parameters '
+                                 'with `estimator.get_params().keys()`.' %
+                                 (key, self))
+
+            if delim:
+                nested_params[key][sub_key] = value
+            else:
+                setattr(self, key, value)
+                valid_params[key] = value
+
+        for key, sub_params in nested_params.items():
+            valid_params[key].set_params(**sub_params)
+
+        return self
 
     def fit(self, x, y):
         """
@@ -39,20 +79,27 @@ class RedolClassifier:
         with pymp.Parallel(self.n_jobs) as p:
             for n_classifier in p.range(0, self.n_estimators):
                 if self.classifier == 'tree':
-                    clf = tree.DecisionTreeClassifier()
+                    clf = tree.DecisionTreeClassifier(max_depth=self.max_depth)
                 elif self.classifier == 'regression':
                     clf = LogisticRegression()
 
                 _x = x
                 _y = y
 
-                if self.bagg:
-                    ind = np.random.randint(0, x.shape[0], x.shape[0])
+                # Bootstrap extractions to train the model.
+                # These extractions can repeat some indices.
+                number_of_extractions = int(self.bootstrap * x.shape[0])
+                ind = np.random.randint(0, x.shape[0], number_of_extractions)
+                _x = x[ind, :]
+                _y = y[ind]
 
-                    _x = x[ind, :]
-                    _y = y[ind]
-
-                modified_x, modified_y = self._change_class(_x, _y)
+                if self.method == "regular":
+                    modified_x, modified_y = self._change_class(_x, _y)
+                elif self.method == "distributed":
+                    modified_x, modified_y = self._change_class_distributed(_x, _y)
+                else:
+                    err_msg = f'The method {self.method} is not a valid method: regular, distributed'
+                    raise RedolClassifierException(err_msg)
 
                 clf.fit(modified_x, modified_y)
 
@@ -158,6 +205,54 @@ class RedolClassifier:
         n_classifiers -= 1
 
         return sum([1 for i, pred in enumerate(self.predictions[n_classifiers, :, :]) if float(np.where(pred == np.amax(pred))[0][0] == y[i])]) / x.shape[0]
+
+    def _change_class_distributed(self, x, y):
+        data = np.c_[x, y]
+
+        y = y.astype('int64')
+
+        # With this formulae: (bin_count[ii]**2).sum()
+        # we are doing the sum of all the class distributions
+        # power 2
+        bin_count = np.bincount(y)
+        ii = np.nonzero(bin_count)[0]
+
+        # w is a formula described in Breiman, Randomizin Outputs
+        # and it means the proportion of class k labels flipped is
+        # w * (1 - k class distribution). The total proportion of
+        # flipped instances is w * (k class distribution) * (1 - k class distribution)
+        w = self.perc / (1 - ((bin_count[ii] / y.shape)**2).sum())
+
+        final_data = []
+        final_class = []
+
+        for c_dist in zip(ii, bin_count[ii] / y.shape):
+            updated_data = data[data[:, -1] == c_dist[0], :].copy()
+            original_data = updated_data.copy()
+            num_data = updated_data.shape[0]
+            percentage = int((c_dist[1] * w) * num_data)
+
+            random_data = list(range(0, num_data))
+            shuffle(random_data)
+
+            if len(self.classes) <= 2:
+                updated_data = self._binary(percentage, random_data, updated_data)
+            else:
+                updated_data = self._multiclass(percentage, random_data, updated_data, y)
+
+            updated_class = [(updated_data[i, -1] == original_data[i, -1]) for i in range(0, num_data)]
+
+            final_data.append(np.array(updated_data))
+            final_class.append(np.array(updated_class))
+
+        final_data = np.concatenate(final_data, axis=0)
+        final_class = np.concatenate(final_class, axis=0)
+
+        # Changes the old class from the data features to the one hot encoder ones
+        if len(self.classes) > 2:
+            final_data = np.c_[final_data[:,:-1], self.enc.transform(final_data[:, -1].reshape(-1, 1)).toarray()]
+
+        return final_data, final_class
 
     def _change_class(self, x, y):
         """
