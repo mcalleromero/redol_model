@@ -39,6 +39,7 @@ class RedolClassifier:
         }
 
     def set_params(self, **params):
+        print(params)
         valid_params = self.get_params(deep=True)
         nested_params = defaultdict(dict)  # grouped by prefix
         for key, value in params.items():
@@ -97,8 +98,10 @@ class RedolClassifier:
                     modified_x, modified_y = self._change_class(_x, _y)
                 elif self.method == "distributed":
                     modified_x, modified_y = self._change_class_distributed(_x, _y)
+                elif self.method == "randomized":
+                    modified_x, modified_y = self._change_class_randomized(_x, _y)
                 else:
-                    err_msg = f'The method {self.method} is not a valid method: regular, distributed'
+                    err_msg = f'The method {self.method} is not a valid method: regular, distributed, randomized'
                     raise RedolClassifierException(err_msg)
 
                 clf.fit(modified_x, modified_y)
@@ -253,6 +256,27 @@ class RedolClassifier:
             final_data = np.c_[final_data[:,:-1], self.enc.transform(final_data[:, -1].reshape(-1, 1)).toarray()]
 
         return final_data, final_class
+
+    def _change_class_randomized(self, x, y):
+        data = np.c_[x, y]
+
+        y = y.astype('int64')
+
+        num_data = data.shape[0]
+        updated_data = data.copy()
+
+        # The attr y' corresponds to the original classes
+        # but shuffled
+        y_new = y.copy()
+        shuffle(y_new)
+        updated_data[:, -1] = y_new
+        updated_class = [(updated_data[i, -1] == data[i, -1]) for i in range(0, num_data)]
+
+        # Changes the old class from the data features to the one hot encoder ones
+        if len(self.classes) > 2:
+            updated_data = np.c_[updated_data[:,:-1], self.enc.transform(updated_data[:, -1].reshape(-1, 1)).toarray()]
+
+        return updated_data, np.array(updated_class)
 
     def _change_class(self, x, y):
         """

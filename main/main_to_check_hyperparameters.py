@@ -9,8 +9,10 @@ import util.properties as properties
 
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 
 import pandas as pd
+import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import BaggingClassifier
@@ -46,38 +48,8 @@ def get_data():
 def main():
 
     X, y = get_data()
+    model = sys.argv[1]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33)
-
-    opt_redol = BayesSearchCV(
-        estimator=RedolClassifier(), 
-        search_spaces=[({
-            # 'n_estimators': Integer(10, 500),
-            # 'method': Categorical(["regular", "distributed"]),
-            'perc': Real(0.5, 0.9, prior='log-uniform'),
-            'bootstrap': Real(0.1, 1.0, prior='log-uniform'),
-            'max_depth': Integer(2, 20),
-        }, 50), ({
-            # 'n_estimators': Integer(10, 500),
-            # 'method': Categorical(["regular", "distributed"]),
-            'perc': Real(0.5, 0.9, prior='log-uniform'),
-            'bootstrap': Real(0.1, 1.0, prior='log-uniform'),
-        }, 50)],
-        n_iter=100,
-        n_jobs=-1,
-    )
-
-    opt_random_forest = BayesSearchCV(
-        estimator=RandomForestClassifier(), 
-        search_spaces={
-            # 'n_estimators': Integer(10, 500),
-            # 'criterion': Categorical(['gini', 'entropy']),
-            'max_depth': Integer(2, 20),
-            'max_features': Categorical(['auto', 'sqrt']),
-        },
-        n_iter=100,
-        n_jobs=-1,
-    )
 
     redol_acc = []
     rf_acc = []
@@ -86,11 +58,64 @@ def main():
 
     n_splits = 10
     skf = StratifiedKFold(n_splits=n_splits)
+
+    starttime = time.time()
+
+    i = 0
+
     for train_index, test_index in skf.split(X, y):
+        i += 1
+        print(f"ITERACION {i}/{n_splits}")
+
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
-        starttime = time.time()
+        opt_redol = BayesSearchCV(
+            estimator=RedolClassifier(), 
+            search_spaces=[({
+                # 'n_estimators': Integer(10, 500),
+                'method': Categorical(["regular", "distributed"]),
+                'perc': Real(0.5, 0.9, prior='log-uniform'),
+                'bootstrap': Real(0.5, 1.0, prior='log-uniform'),
+                'max_depth': Integer(2, 15),
+            }, 50), ({
+                # 'n_estimators': Integer(10, 500),
+                'method': Categorical(["regular", "distributed"]),
+                'perc': Real(0.5, 0.9, prior='log-uniform'),
+                'bootstrap': Real(0.5, 1.0, prior='log-uniform'),
+            }, 50)],
+            n_iter=100,
+            n_jobs=8,
+        )
+
+        # opt_redol = BayesSearchCV(
+        #     estimator=RedolClassifier(), 
+        #     search_spaces={
+        #         'perc': Real(0.5, 0.9, prior='log-uniform'),
+        #         'bootstrap': Real(0.5, 1.0, prior='log-uniform'),
+        #         'max_depth': Integer(2, 15),
+        #     },
+        #     n_iter=100,
+        #     n_jobs=-1,
+        #     refit=True,
+        # )
+
+        opt_random_forest = BayesSearchCV(
+            estimator=RandomForestClassifier(), 
+            search_spaces=[({
+                # 'n_estimators': Integer(10, 500),
+                # 'criterion': Categorical(['gini', 'entropy']),
+                'max_depth': Integer(2, 15),
+                'max_features': Categorical([None, 'sqrt']),
+            }, 50), ({
+                'max_depth': Integer(2, 15),
+                'max_features': Categorical([None, 'sqrt']),
+                'max_samples': Real(0.5, 0.9, prior='log-uniform'),
+            }, 50)],
+            n_iter=100,
+            n_jobs=8,
+            refit=True,
+        )
 
         print("Entrenamiento Redol\n")
         opt_redol.fit(X_train, y_train)
@@ -99,10 +124,6 @@ def main():
         redol_acc.append(1 - metrics.accuracy_score(y_test, redol_y_pred))
         redol_auc.append(1 - metrics.roc_auc_score(y_test, redol_y_pred_probas[:, 1]))
 
-        print('That took {} seconds'.format(time.time() - starttime))
-
-        starttime = time.time()
-
         print("Entrenamiento Random Forest\n")
         opt_random_forest.fit(X_train, y_train)
         random_forest_y_pred_probas = opt_random_forest.predict_proba(X_test)
@@ -110,20 +131,22 @@ def main():
         rf_acc.append(1 - metrics.accuracy_score(y_test, random_forest_y_pred))
         rf_auc.append(1 - metrics.roc_auc_score(y_test, random_forest_y_pred_probas[:, 1]))
 
-        print('That took {} seconds'.format(time.time() - starttime))
+        print("----------------------------------------------")
+        print("{} Redol best params:{} {}".format(properties.COLOR_BLUE, properties.END_C, opt_redol.best_params_))
+        print("{} Random forest best params:{} {}".format(properties.COLOR_BLUE, properties.END_C, opt_random_forest.best_params_))
+        print("{} Redol err:{} {}".format(properties.COLOR_BLUE, properties.END_C, 1 - metrics.accuracy_score(y_test, redol_y_pred)))
+        print("{} Random forest err:{} {}".format(properties.COLOR_BLUE, properties.END_C, 1 - metrics.accuracy_score(y_test, random_forest_y_pred)))
 
-        print("----------------------------------------------")
-        print("{} Redol err:{} {}".format(properties.COLOR_BLUE, properties.END_C, (1-metrics.accuracy_score(y_test, redol_y_pred))))
-        print("{} Random forest err:{} {}".format(properties.COLOR_BLUE, properties.END_C, (1-metrics.accuracy_score(y_test, random_forest_y_pred))))
-        print("----------------------------------------------")
-        print("{} Redol acc:{} {}".format(properties.COLOR_BLUE, properties.END_C, metrics.accuracy_score(y_test, redol_y_pred)))
-        print("{} Random forest acc:{} {}".format(properties.COLOR_BLUE, properties.END_C, metrics.accuracy_score(y_test, random_forest_y_pred)))
-        print("----------------------------------------------")
-        print("{} Redol auc:{} {}".format(properties.COLOR_BLUE, properties.END_C, metrics.roc_auc_score(y_test, redol_y_pred_probas[:, 1])))
-        print("{} Random forest auc:{} {}".format(properties.COLOR_BLUE, properties.END_C, metrics.roc_auc_score(y_test, random_forest_y_pred_probas[:, 1])))
-        # print("----------------------------------------------")
-        # print("{} Redol params:{} {}".format(properties.COLOR_BLUE, properties.END_C, opt_redol.get_params()))
-        # print("{} Random forest params:{} {}".format(properties.COLOR_BLUE, properties.END_C, opt_random_forest.get_params()))
+    print('That took {} seconds'.format(time.time() - starttime))
+    print("----------------------------------------------")
+    print("{} Redol err:{} {}".format(properties.COLOR_BLUE, properties.END_C, np.mean(redol_acc)))
+    print("{} Random forest err:{} {}".format(properties.COLOR_BLUE, properties.END_C, np.mean(rf_acc)))
+    print("----------------------------------------------")
+    print("{} Redol auc:{} {}".format(properties.COLOR_BLUE, properties.END_C, np.mean(redol_auc)))
+    print("{} Random forest auc:{} {}".format(properties.COLOR_BLUE, properties.END_C, np.mean(rf_auc)))
+
+    np.save(f"../data/results/hyperparameter_redol_{model}_metrics", np.array([redol_acc, redol_auc]))
+    np.save(f"../data/results/hyperparameter_rf_{model}_metrics", np.array([rf_acc, rf_auc]))
 
 if __name__ == "__main__":
     main()
