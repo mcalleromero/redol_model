@@ -1,5 +1,4 @@
 import sys
-sys.path.append('/home/cromero/redol_model/')
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -7,15 +6,15 @@ import pandas as pd
 import numpy as np
 
 from sklearn.ensemble import BaggingClassifier
-from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn import tree
 
 from tqdm import tqdm
 
 def get_data(model):
         try:
-            dataset = pd.read_csv(f'../data/modified/{model}.csv')
+            dataset = pd.read_csv(f'../data/original/{model}.csv')
 
             cat_columns = ['class']
 
@@ -38,12 +37,11 @@ def main():
 
     X, y = get_data(model)
 
-    n_trees = 100
-    k_folds = 100
+    k_folds = 30
 
     print(f'Stratifying {model}')
 
-    skf = StratifiedShuffleSplit(n_splits=k_folds, test_size=0.66)
+    skf = StratifiedShuffleSplit(n_splits=k_folds, test_size=0.33)
 
     train = []
     test = []
@@ -51,8 +49,8 @@ def main():
         train.append(train_index)
         test.append(test_index)
 
-    train_path = f'../data/stratified_index/{model}_train'
-    test_path = f'../data/stratified_index/{model}_test'
+    train_path = f'../data/stratified_index/{model}_30folds_33test_train'
+    test_path = f'../data/stratified_index/{model}_30folds_33test_test'
 
     np.save(train_path, np.array(train))
     np.save(test_path, np.array(test))

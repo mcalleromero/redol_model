@@ -40,14 +40,16 @@ def create_full_dataset(n, dimm, model, noise=None):
         c[:n2, :] = 0
 
     elif model == "ringnorm_normal":
-        a = 1 / np.sqrt(dimm)
+        a = 2 / np.sqrt(dimm)
 
         n2 = int(n / 2)
 
         # tiene que dar 1% de error approx.
         # multivariate_normal
-        x[:n2, :] = np.random.multivariate_normal(0, 4.0, (n2, dimm))
-        x[n2:, :] = np.random.multivariate_normal(a, 1.0, (n2, dimm))
+        x[:n2, :] = np.random.multivariate_normal(
+            np.repeat(0, dimm), 4.0*np.eye(dimm), n2)
+        x[n2:, :] = np.random.multivariate_normal(
+            np.repeat(a, dimm), np.eye(dimm), n2)
 
         c = np.ones((n, 1))
         c[:n2, :] = 0
