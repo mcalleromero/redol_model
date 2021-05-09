@@ -23,7 +23,7 @@ def get_data():
 
             cat_columns = ['class']
 
-            if sys.argv[1] == "tic-tac-toe":
+            if sys.argv[1] == "tic-tac-toe" or sys.argv[1] == "aps_failure":
                 cat_columns = dataset.select_dtypes(['object']).columns
 
             dataset[cat_columns] = dataset[cat_columns].astype('category')
@@ -46,10 +46,13 @@ def main():
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33)
 
+    print(f"SHAPE OF X: {X.shape}")
+
     n_trees = 100
 
     redolclf = RedolClassifier(n_estimators=n_trees, perc=0.75, n_jobs=8)
     distributedredolclf = RedolClassifier(n_estimators=n_trees, method="distributed", perc=0.5, n_jobs=8)
+    nnredolclf = RedolClassifier(n_estimators=n_trees, nearest_neighbours="3", perc=0.75, n_jobs=8)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
     boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
     baggingclf = BaggingClassifier(n_estimators=n_trees)
@@ -62,9 +65,19 @@ def main():
 
     print('That took {} seconds'.format(time.time() - starttime))
 
-    print("Entrenamiento Dsitributed Redol\n")
+    starttime = time.time()
+
+    print("Entrenamiento Distributed Redol\n")
     distributedredolclf.fit(X_train, y_train)
     distributedredolclf.predict(X_test)
+
+    print('That took {} seconds'.format(time.time() - starttime))
+
+    starttime = time.time()
+
+    print("Entrenamiento NearestNeighbours Redol\n")
+    nnredolclf.fit(X_train, y_train)
+    nnredolclf.predict(X_test)
 
     print('That took {} seconds'.format(time.time() - starttime))
 
@@ -94,7 +107,8 @@ def main():
 
     print("----------------------------------------------")
     print("{} Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, redolclf.score(X_test, y_test)))
-    print("{} Dsitributed Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, distributedredolclf.score(X_test, y_test)))
+    print("{} Distributed Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, distributedredolclf.score(X_test, y_test)))
+    print("{} NearestNeighbours Redol:{} {}".format(properties.COLOR_BLUE, properties.END_C, nnredolclf.score(X_test, y_test)))
     print("{} Random forest score:{} {}".format(properties.COLOR_BLUE, properties.END_C, rfclf.score(X_test, y_test)))
     print("{} Boosting score:{} {}".format(properties.COLOR_BLUE, properties.END_C, boostingclf.score(X_test, y_test)))
     print("{} Bagging score:{} {}".format(properties.COLOR_BLUE, properties.END_C, baggingclf.score(X_test, y_test)))

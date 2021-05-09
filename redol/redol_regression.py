@@ -3,15 +3,63 @@
 from __future__ import division
 
 import numpy as np
-from random import *
-
+import numpy.random as rand
+import random
 from sklearn import tree
-from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.tree import DecisionTreeRegressor
+from collections import defaultdict
+from sklearn.neighbors import NearestNeighbors
+
+import pymp
+
+def RedolRegressorException(Exception):
+    pass
 
 
-class RegressionRedol:
+class RedolRegressor:
 
+    def __init__(self, n_estimators=100, method="regular", perc=0.75, repetitions=3, nearest_neighbours=5, bootstrap=1.0, iterations=3, n_jobs=8):
+        self.n_estimators = n_estimators
+        self.method = method
+        self.perc = perc
+        self.repetitions = repetitions
+        self.bootstrap = bootstrap
+        self.iterations = iterations
+        self.n_jobs = n_jobs
+        self.nearest_neighbours = nearest_neighbours
+
+    # def get_params(self, deep=True):
+    #     # TODO: With deep true it should return base learners params too
+    #     return {
+    #         'n_estimators': self.n_estimators,
+    #         'method': self.method,
+    #         'perc': self.perc,
+    #         'bootstrap': self.bootstrap,
+    #         'n_jobs': self.n_jobs,
+    #     }
+
+    # def set_params(self, **params):
+    #     valid_params = self.get_params(deep=True)
+    #     nested_params = defaultdict(dict)  # grouped by prefix
+    #     for key, value in params.items():
+    #         key, delim, sub_key = key.partition('__')
+    #         if key not in valid_params:
+    #             raise ValueError('Invalid parameter %s for estimator %s. '
+    #                              'Check the list of available parameters '
+    #                              'with `estimator.get_params().keys()`.' %
+    #                              (key, self))
+
+    #         if delim:
+    #             nested_params[key][sub_key] = value
+    #         else:
+    #             setattr(self, key, value)
+    #             valid_params[key] = value
+
+    #     for key, sub_params in nested_params.items():
+    #         valid_params[key].set_params(**sub_params)
+
+    #     return self
 
     def fit(self, x, y):
         """
@@ -23,13 +71,42 @@ class RegressionRedol:
         """
         self.classes = np.unique(y)
 
-        self.enc = OneHotEncoder(handle_unknown='ignore')
-        self.enc.fit(y.reshape(-1, 1))
+        # self.enc = OneHotEncoder(handle_unknown='ignore')
+        # self.enc.fit(y.reshape(-1, 1))
 
-        modified_x, modified_y = self._change_class(x, y)
+        # self.classifiers = []
+        self.classifiers = pymp.shared.list()
 
-        self.clf = LogisticRegression()
-        self.clf.fit(modified_x, modified_y)
+        with pymp.Parallel(self.n_jobs) as p:
+            for n_classifier in p.range(0, self.n_estimators):
+                clf = DecisionTreeRegressor()
+
+                _x = x
+                _y = y
+
+                # Bootstrap extractions to train the model.
+                # These extractions can repeat some indices.
+                number_of_extractions = int(self.bootstrap * x.shape[0])
+                ind = np.random.randint(0, x.shape[0], number_of_extractions)
+
+                _x = x[ind, :]
+                _y = y[ind]
+
+                if self.method == "regular":
+                    modified_x, modified_y = self._change_class(_x, _y)
+                # elif self.method == "distributed":
+                #     modified_x, modified_y = self._change_class_distributed(_x, _y)
+                # elif self.method == "randomized":
+                #     modified_x, modified_y = self._change_class_randomized(_x, _y)
+                else:
+                    err_msg = f'The method {self.method} is not a valid method: regular, distributed, randomized'
+                    raise RedolRegressorException(err_msg)
+
+                clf.fit(modified_x, modified_y)
+
+                # self.classifiers[n_classifier] = clf
+                with p.lock:
+                    self.classifiers.append(clf)
 
     def score(self, x, y):
         """
@@ -43,18 +120,8 @@ class RegressionRedol:
         """
         return sum([1 for i, prediction in enumerate(self.predict(x)) if prediction == y[i]])/x.shape[0]
 
+
     def predict(self, x):
-        """
-        This method is used to generate the class predictions from each example to be classified.
-        It uses the method predict_proba to calculate the probabilities that a data is well classified or not.
-
-        :param x: original features from the dataset
-        :param suggested_class: a new feature added to classify the examples
-        :return: an array with the predicted class for each example from the dataset
-        """
-        return np.array([float(np.where(pred == np.amax(pred))[0][0]) for pred in self.predict_proba(x)])
-
-    def predict_proba(self, x):
         """
         This method calculates the probability that a data is well classified or not. It adds a new feature
         to the dataset depending on the suggested_class attribute.
@@ -65,16 +132,20 @@ class RegressionRedol:
         """
         predictions = []
 
-        for cl in self.classes:
+        for it in range(self.iterations):
             preds = []
 
+            sugg_class = rand.choice(self.classes, size=x.shape[0], replace=True)
+
             _x = x.copy()
-            _x = np.c_[_x, np.tile(self.enc.transform(cl.reshape(-1, 1)).toarray(), (x.shape[0],1))]
+            _x = np.c_[_x, sugg_class]
 
-            preds = self.clf.predict_proba(_x)
-            predictions.append(preds[:, 1])
+            # As the method is predicting 0 value I sum the sugg class, not sure about this at all
+            [preds.append(clf.predict(_x) + sugg_class) for clf in self.classifiers]
+            # preds = np.array(preds).mean(axis=0)
+            predictions.append(np.array(preds).T)
 
-        return np.array(predictions).transpose()
+        return np.array(predictions).mean(axis=2).mean(axis=0)
 
     def _change_class(self, x, y):
         """
@@ -94,16 +165,91 @@ class RegressionRedol:
 
         num_data = data.shape[0]
 
-        updated_data = []
+        percentage = int(num_data * self.perc)
 
-        for _instance in data:
-            for _cl in self.classes:
-                _new_class = 1. if _instance[-1] == _cl else 0.
-                _new_instance = np.concatenate([_instance[:-1], self.enc.transform([[_cl]]).toarray()[0]])
-                _new_instance = np.append(_new_instance, _new_class)
+        updated_data = data.copy()
 
-                updated_data.append(_new_instance)
+        random_data = list(range(0, num_data))
+        random.shuffle(random_data)
 
-        updated_data = np.array(updated_data)
+        if self.nearest_neighbours:
+            updated_data, updated_class = self._regression_NN_change(percentage, random_data, updated_data, y)
+        else:
+            updated_data, updated_class = self._regression_change(percentage, random_data, updated_data, y)
 
-        return updated_data[:,:-1], updated_data[:,-1]
+        return updated_data, np.array(updated_class)
+
+    def _regression_change(self, percentage, random_data, updated_data, y):
+        # TODO: This set might be too large as it is saving all y regression values
+        # and it s been copied for each num in the loop
+        classes = list(set(y))
+
+        new_data = np.array([], dtype=np.int64).reshape(0, updated_data.shape[1])
+        new_class = []
+
+        for num in random_data[:percentage]:
+            prev_class = updated_data[num, -1]
+            classes_without_prev_class = classes.copy()  # copy classes list
+            classes_without_prev_class.remove(prev_class)
+
+            # Repeat each example repetitions times and randomize it
+            updated_data_repeated = np.tile(updated_data[num, :], (self.repetitions, 1))
+            updated_data_repeated[:, -1] = rand.choice(classes_without_prev_class, self.repetitions)
+            y_repeated = np.tile(y[num], self.repetitions)
+            new_data = np.concatenate((new_data, updated_data_repeated))
+            new_class = np.append(new_class, y_repeated)
+        
+        # Remove randomized data
+        old_data = np.delete(updated_data, random_data[:percentage], axis=0)
+        old_class = np.delete(y, random_data[:percentage])
+
+        updated_data = np.concatenate((old_data, new_data))
+        updated_class = np.append(old_class, new_class)
+
+        # Main difference with RedolClassifier is the new class is the difference
+        # between the prev class and another randomly suggested class
+        updated_class = (updated_data[:, -1] - updated_class)
+
+        return updated_data, updated_class
+
+    def _regression_NN_change(self, percentage, random_data, updated_data, y):
+        # TODO: This set might be too large as it is saving all y regression values
+        # and it s been copied for each num in the loop
+        classes = list(set(y))
+
+        nn = NearestNeighbors()
+        nn.fit(updated_data)
+
+        new_data = np.array([], dtype=np.int64).reshape(0, updated_data.shape[1])
+        new_class = []
+
+        for num in random_data[:percentage]:
+            prev_class = updated_data[num, -1]
+            nn_idx = nn.kneighbors(X=[updated_data[num]], n_neighbors=self.nearest_neighbours, return_distance=False)
+            classes_without_prev_class = updated_data[nn_idx, -1]
+            classes_without_prev_class = set(classes_without_prev_class[0])
+            classes_without_prev_class.discard(prev_class)
+            # If classes from neighbours are equal, we choose randomly from any other class
+            if not classes_without_prev_class:
+                classes_without_prev_class = classes.copy()
+                classes_without_prev_class.remove(prev_class)
+
+            # Repeat each example repetitions times and randomize it
+            updated_data_repeated = np.tile(updated_data[num, :], (self.repetitions, 1))
+            updated_data_repeated[:, -1] = rand.choice(list(classes_without_prev_class), self.repetitions)
+            y_repeated = np.tile(y[num], self.repetitions)
+            new_data = np.concatenate((new_data, updated_data_repeated))
+            new_class = np.append(new_class, y_repeated)
+        
+        # Remove randomized data
+        old_data = np.delete(updated_data, random_data[:percentage], axis=0)
+        old_class = np.delete(y, random_data[:percentage])
+
+        updated_data = np.concatenate((old_data, new_data))
+        updated_class = np.append(old_class, new_class)
+
+        # Main difference with RedolClassifier is the new class is the difference
+        # between the prev class and another randomly suggested class
+        updated_class = (updated_data[:, -1] - updated_class)
+
+        return updated_data, updated_class

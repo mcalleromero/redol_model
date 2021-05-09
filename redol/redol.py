@@ -6,18 +6,19 @@ import numpy as np
 from random import *
 from sklearn import tree
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import NearestNeighbors
+
 from collections import defaultdict
 
 import pymp
 
-def RedolClassifierException(Exception):
+class RedolClassifierException(Exception):
     pass
 
 
 class RedolClassifier:
 
-    def __init__(self, n_estimators=100, method="regular", perc=0.75, bootstrap=1.0, classifier='tree', n_jobs=8, max_depth=None):
+    def __init__(self, n_estimators=100, method="regular", perc=0.75, bootstrap=1.0, nearest_neighbours=None, n_jobs=8, max_depth=None):
         self.n_estimators = n_estimators
         self.method = method
         self.perc = perc
@@ -25,6 +26,7 @@ class RedolClassifier:
         self.classifier = classifier
         self.n_jobs = n_jobs
         self.max_depth = max_depth
+        self.nearest_neighbours = nearest_neighbours
 
     def get_params(self, deep=True):
         # TODO: With deep true it should return base learners params too
@@ -36,10 +38,10 @@ class RedolClassifier:
             'n_jobs': self.n_jobs,
             'max_depth': self.max_depth,
             'method': self.method,
+            'nearest_neighbours': self.nearest_neighbours,
         }
 
     def set_params(self, **params):
-        print(params)
         valid_params = self.get_params(deep=True)
         nested_params = defaultdict(dict)  # grouped by prefix
         for key, value in params.items():
@@ -79,10 +81,7 @@ class RedolClassifier:
 
         with pymp.Parallel(self.n_jobs) as p:
             for n_classifier in p.range(0, self.n_estimators):
-                if self.classifier == 'tree':
-                    clf = tree.DecisionTreeClassifier(max_depth=self.max_depth)
-                elif self.classifier == 'regression':
-                    clf = LogisticRegression()
+                clf = tree.DecisionTreeClassifier(max_depth=self.max_depth)
 
                 _x = x
                 _y = y
@@ -94,7 +93,15 @@ class RedolClassifier:
                 _x = x[ind, :]
                 _y = y[ind]
 
-                if self.method == "regular":
+                # If nearest neighbours are set, the method parameter is ignored
+                # as it will be using the k nearest neighbours
+                if self.nearest_neighbours:
+                    try:
+                        modified_x, modified_y = self._change_class_nearest_neighbours(_x, _y)
+                    except TypeError as e:
+                        err_msg = f'Nearest neighbours parameter must be None or an integer within (1, N), N being X instances. It was set to {self.nearest_neighbours}'
+                        raise RedolClassifierException(err_msg)
+                elif self.method == "regular":
                     modified_x, modified_y = self._change_class(_x, _y)
                 elif self.method == "distributed":
                     modified_x, modified_y = self._change_class_distributed(_x, _y)
@@ -278,6 +285,41 @@ class RedolClassifier:
 
         return updated_data, np.array(updated_class)
 
+    def _change_class_nearest_neighbours(self, x, y):
+        """
+        Given a data set split in features and classes this method transforms this set into another set.
+        This new set is created based on random noise generation and its classification. The randomization
+        of the new data set is given by the percentage received from the class constructor.
+
+        The randomization is generated changing some data classes and pointing it out in the new class.
+        The new class is calculated comparing the original class with the data randomization. For this new class
+        '1' means "well classified" and '0', the opposite.
+
+        :param x: features from the original data set
+        :param y: classes from the original data set
+        :return: features and classes from the new data set
+        """
+        data = np.c_[x, y]
+
+        num_data = data.shape[0]
+
+        percentage = int(num_data * self.perc)
+
+        updated_data = data.copy()
+
+        random_data = list(range(0, num_data))
+        shuffle(random_data)
+
+        updated_data = self._nearest_neighbours(percentage, random_data, updated_data, y)
+
+        updated_class = [(updated_data[i, -1] == data[i, -1]) for i in range(0, num_data)]
+
+        # Changes the old class from the data features to the one hot encoder ones
+        if len(self.classes) > 2:
+            updated_data = np.c_[updated_data[:,:-1], self.enc.transform(updated_data[:, -1].reshape(-1, 1)).toarray()]
+
+        return updated_data, np.array(updated_class)
+
     def _change_class(self, x, y):
         """
         Given a data set split in features and classes this method transforms this set into another set.
@@ -330,5 +372,26 @@ class RedolClassifier:
             classes_without_prev_class = classes.copy()  # copy classes list
             classes_without_prev_class.remove(prev_class)
             updated_data[num, -1] = choice(classes_without_prev_class)
+
+        return updated_data
+
+    def _nearest_neighbours(self, percentage, random_data, updated_data, y):
+        classes = set(y)
+
+        nn = NearestNeighbors()
+        nn.fit(updated_data)
+
+        for num in random_data[:percentage]:
+            prev_class = updated_data[num, -1]
+            nn_idx = nn.kneighbors(X=[updated_data[num]], n_neighbors=self.nearest_neighbours, return_distance=False)
+            classes_without_prev_class = updated_data[nn_idx, -1]
+            classes_without_prev_class = set(classes_without_prev_class[0])
+            classes_without_prev_class.discard(prev_class)
+            # If classes from neighbours are equal, we choose randomly from any other class
+            if not classes_without_prev_class:
+                classes_without_prev_class = classes.copy()
+                classes_without_prev_class.discard(prev_class)
+
+            updated_data[num, -1] = choice(list(classes_without_prev_class))
 
         return updated_data
