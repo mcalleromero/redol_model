@@ -37,8 +37,8 @@ def main():
 
     print("MODEL\t\t\tREDOL\t\tRANDOM F.")
     for model in models:
-        redol = np.load(f"../data/results/hyperparameter_redol_{model}_metrics2.npy")
-        rf = np.load(f"../data/results/hyperparameter_rf_{model}_metrics2.npy")
+        redol = np.load(f"../data/results/hyperparameter_redol_{model}_metrics3.npy")
+        rf = np.load(f"../data/results/hyperparameter_rf_{model}_metrics3.npy")
 
         print(f"{model}\t\t\t{round(np.mean(redol)*100, 3)}+-{round(np.std(redol)*100, 3)}\t\t{round(np.mean(rf)*100, 3)}+-{round(np.std(rf)*100, 3)}")
 

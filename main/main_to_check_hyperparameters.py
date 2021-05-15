@@ -10,6 +10,8 @@ import util.properties as properties
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.preprocessing import StandardScaler
 
 import pandas as pd
 import numpy as np
@@ -57,7 +59,7 @@ def main():
     # rf_auc = []
 
     n_splits = 10
-    skf = StratifiedKFold(n_splits=n_splits)
+    skf = StratifiedShuffleSplit(n_splits=n_splits, test_size=0.33)
 
     i = 0
 
@@ -72,37 +74,23 @@ def main():
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
-        # opt_redol = BayesSearchCV(
-        #     estimator=RedolClassifier(), 
-        #     search_spaces=[({
-        #         # 'n_estimators': Integer(10, 500),
-        #         'method': Categorical(["regular", "distributed"]),
-        #         'perc': Real(0.5, 0.8),
-        #         'bootstrap': Real(0.8, 1.0),
-        #         'max_depth': Integer(2, 15),
-        #     }, 50), ({
-        #         # 'n_estimators': Integer(10, 500),
-        #         'method': Categorical(["regular", "distributed"]),
-        #         'perc': Real(0.5, 0.8),
-        #         'bootstrap': Real(0.8, 1.0),
-        #     }, 50)],
-        #     n_iter=100,
-        #     n_jobs=4,
-        # )
+        print(f"Scaling data")
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
 
         opt_redol = BayesSearchCV(
             estimator=RedolClassifier(), 
             search_spaces=[({
                 # 'n_estimators': Integer(10, 500),
                 'method': Categorical(["regular", "distributed"]),
-                'perc': Real(0.5, 0.8),
-                'bootstrap': Real(0.8, 1.0),
-            }, 50), ({
-                'nearest_neighbours': Integer(3, 7),
-                'perc': Real(0.5, 0.8),
-                'bootstrap': Real(0.8, 1.0),
+                'pil': Real(0.5, 0.8),
+                'bootstrap': Real(0.8, 1.3),
+            }, 100), ({
+                'nearest_neighbours': Integer(4, 8),
+                'pil': Real(0.5, 0.8),
             }, 50)],
-            n_iter=100,
+            n_iter=150,
             n_jobs=4,
         )
 
@@ -118,9 +106,9 @@ def main():
                 'min_samples_split': Integer(2, 10),
                 'max_depth': Integer(2, 15),
                 'max_features': Categorical([None, 'sqrt']),
-                'max_samples': Real(0.8, 0.999, prior='log-uniform'),
-            }, 50)],
-            n_iter=100,
+                'max_samples': Real(0.8, 0.999),
+            }, 100)],
+            n_iter=150,
             n_jobs=4,
         )
 
@@ -154,8 +142,8 @@ def main():
     # print("{} Redol auc:{} {}".format(properties.COLOR_BLUE, properties.END_C, np.mean(redol_auc)))
     # print("{} Random forest auc:{} {}".format(properties.COLOR_BLUE, properties.END_C, np.mean(rf_auc)))
 
-    np.save(f"../data/results/hyperparameter_redol_{model}_metrics3", np.array(redol_acc,))
-    np.save(f"../data/results/hyperparameter_rf_{model}_metrics3", np.array(rf_acc))
+    np.save(f"../data/results/hyperparameter_redol_{model}_metrics4", np.array(redol_acc,))
+    np.save(f"../data/results/hyperparameter_rf_{model}_metrics4", np.array(rf_acc))
 
 if __name__ == "__main__":
     main()

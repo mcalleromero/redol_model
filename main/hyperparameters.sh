@@ -1,6 +1,6 @@
-#datasets=("australian" "diabetes" "german" "heart" "ionosphere" "magic04")
+datasets=("australian" "diabetes" "german" "heart" "ionosphere" "magic04")
 #datasets=("new-thyroid" "ringnorm" "segment" "threenorm")
-datasets=("tic-tac-toe" "twonorm" "waveform" "wdbc" "wine")
+#datasets=("tic-tac-toe" "twonorm" "waveform" "wdbc" "wine")
 
 for DATASET in "${datasets[@]}"
 do

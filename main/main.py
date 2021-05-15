@@ -5,7 +5,7 @@ import time
 import util.properties as properties
 
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import make_moons
+from sklearn.preprocessing import StandardScaler
 
 import pandas as pd
 
@@ -48,11 +48,16 @@ def main():
 
     print(f"SHAPE OF X: {X.shape}")
 
+    print(f"Scaling data")
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
     n_trees = 100
 
-    redolclf = RedolClassifier(n_estimators=n_trees, perc=0.75, n_jobs=8)
-    distributedredolclf = RedolClassifier(n_estimators=n_trees, method="distributed", perc=0.5, n_jobs=8)
-    nnredolclf = RedolClassifier(n_estimators=n_trees, nearest_neighbours="3", perc=0.75, n_jobs=8)
+    redolclf = RedolClassifier(n_estimators=n_trees, pil=0.75, n_jobs=8, bootstrap=1.3)
+    distributedredolclf = RedolClassifier(n_estimators=n_trees, method="distributed", pil=0.5, n_jobs=8)
+    nnredolclf = RedolClassifier(n_estimators=n_trees, nearest_neighbours=4, pil=0.75, n_jobs=8)
     rfclf = RandomForestClassifier(n_estimators=n_trees)
     boostingclf = GradientBoostingClassifier(n_estimators=n_trees)
     baggingclf = BaggingClassifier(n_estimators=n_trees)
